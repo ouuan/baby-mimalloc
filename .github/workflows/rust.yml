@@ -32,6 +32,6 @@ jobs:
     - name: Clippy
       run: cargo clippy ${{ steps.features.outputs.features }}
     - name: Build
-      run: cargo build ${{ steps.features.outputs.features }}
+      run: cargo build --release ${{ steps.features.outputs.features }}
     - name: Run tests
       run: cargo test ${{ steps.features.outputs.features }} --release -- --test-threads 1
