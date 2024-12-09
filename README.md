@@ -1,7 +1,7 @@
 # baby-mimalloc
 
-![Crates.io Version](https://shields.ouuan.moe/crates/v/baby-mimalloc)
-![docs.rs](https://shields.ouuan.moe/docsrs/baby-mimalloc)
+[![Crates.io Version](https://shields.ouuan.moe/crates/v/baby-mimalloc)](https://crates.io/crates/baby-mimalloc)
+[![docs.rs](https://shields.ouuan.moe/docsrs/baby-mimalloc)](https://docs.rs/baby-mimalloc/latest/baby_mimalloc/)
 
 [Mimalloc](https://github.com/microsoft/mimalloc) implemented in Rust (not a binding to the C library) with only basic features.
 
