@@ -14,6 +14,7 @@ It can be used in `no_std` environments.
 - **mmap** - Provide `MimallocMmap` that uses `mmap` as OS allocator for segments.
 - **std_mutex** - Provide `MimallocMutexWrapper` that wraps `Mimalloc` inside `std::sync::Mutex` and implements `GlobalAlloc`.
 - **spin_mutex** - Provide `MimallocMutexWrapper` that wraps `Mimalloc` inside `spin::Mutex` that can be used in `no_std` environments.
+- **deferred_free** - Enable registering a hook to complete deferred free events. See the documentation of [`mi_register_deferred_free`](https://microsoft.github.io/mimalloc/group__extended.html#ga3460a6ca91af97be4058f523d3cb8ece).
 
 ## Usage
 

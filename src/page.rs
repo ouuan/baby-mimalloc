@@ -5,6 +5,8 @@ use crate::heap::Heap;
 use crate::list::impl_list_item;
 use crate::segment::Segment;
 use crate::utils::bin_for_size;
+#[cfg(feature = "deferred_free")]
+use crate::DeferredFreeHook;
 use core::alloc::GlobalAlloc;
 use core::ptr::{null_mut, NonNull};
 
@@ -46,6 +48,7 @@ impl Page {
         heap: &'a mut Heap,
         size: usize,
         os_alloc: &A,
+        #[cfg(feature = "deferred_free")] deferred_free_hook: Option<DeferredFreeHook<A>>,
     ) -> Option<(NonNull<u8>, &'a mut Page)> {
         debug_assert!(
             page.as_ptr() == empty_page().as_ptr()
@@ -54,7 +57,12 @@ impl Page {
             { unsafe { page.as_ref() }.block_size }
         );
         match unsafe { page.as_ref().free.as_mut() } {
-            None => heap.malloc_generic(size, os_alloc),
+            None => heap.malloc_generic(
+                size,
+                os_alloc,
+                #[cfg(feature = "deferred_free")]
+                deferred_free_hook,
+            ),
             Some(block) => {
                 debug_assert!(
                     (block as *const _ as usize).wrapping_sub(page.as_ptr() as usize)

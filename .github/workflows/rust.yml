@@ -13,19 +13,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        features:
+        mmap:
           - ""
-          - "--features mmap"
-          - "--features std_mutex"
-          - "--features spin_mutex"
-          - "--features mmap,std_mutex"
-          - "--features mmap,spin_mutex"
+          - "-F mmap"
+        mutex:
+          - ""
+          - "-F std_mutex"
+          - "-F spin_mutex"
+        deferred_free:
+          - ""
+          - "-F deferred_free"
     steps:
     - uses: actions/checkout@v4
     - uses: actions-rust-lang/setup-rust-toolchain@v1
+    - name: Calculate features
+      id: features
+      run: echo "features=${{ matrix.mmap }} ${{ matrix.mutex }} ${{ matrix.deferred_free }}" >> "$GITHUB_OUTPUT"
     - name: Clippy
-      run: cargo clippy ${{ matrix.features }}
+      run: cargo clippy ${{ steps.features.outputs.features }}
     - name: Build
-      run: cargo build ${{ matrix.features }}
+      run: cargo build ${{ steps.features.outputs.features }}
     - name: Run tests
-      run: cargo test ${{ matrix.features }} --release -- --test-threads 1
+      run: cargo test ${{ steps.features.outputs.features }} --release -- --test-threads 1

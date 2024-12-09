@@ -29,6 +29,8 @@
 //!   [`std::sync::Mutex`] and implements [`GlobalAlloc`].
 //! - **spin_mutex** - Provide [`MimallocMutexWrapper`] that wraps [`Mimalloc`] inside
 //!   [`spin::Mutex`] that can be used in `no_std` environments.
+//! - **deferred_free** - Enable registering a hook to complete deferred free events.
+//!   See the documentation of [`mi_register_deferred_free`](https://microsoft.github.io/mimalloc/group__extended.html#ga3460a6ca91af97be4058f523d3cb8ece).
 
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -55,7 +57,14 @@ use heap::Heap;
 pub struct Mimalloc<A: GlobalAlloc> {
     heap: Heap,
     os_alloc: A,
+    #[cfg(feature = "deferred_free")]
+    deferred_free_hook: Option<DeferredFreeHook<A>>,
 }
+
+#[cfg(feature = "deferred_free")]
+pub mod deferred_free;
+#[cfg(feature = "deferred_free")]
+use deferred_free::*;
 
 unsafe impl<A: GlobalAlloc> Send for Mimalloc<A> {}
 
@@ -65,17 +74,20 @@ impl<A: GlobalAlloc> Mimalloc<A> {
         Self {
             heap: Heap::new(),
             os_alloc,
+            #[cfg(feature = "deferred_free")]
+            deferred_free_hook: None,
         }
     }
 
+    #[cfg(feature = "deferred_free")]
     /// Register a hook to complete deferred free when the allocator needs more memory.
     /// A new hook replaces the old one.
     ///
     /// See the documentation of
     /// [`mi_register_deferred_free`](https://microsoft.github.io/mimalloc/group__extended.html#ga3460a6ca91af97be4058f523d3cb8ece)
     /// (the extra `arg` is not supported).
-    pub const fn register_deferred_free(&mut self, hook: fn(force: bool, heartbeat: u64)) {
-        self.heap.register_deferred_free(hook)
+    pub const fn register_deferred_free(&mut self, hook: DeferredFreeHook<A>) {
+        self.deferred_free_hook = Some(hook);
     }
 
     /// Collect free memory.
@@ -89,8 +101,13 @@ impl<A: GlobalAlloc> Mimalloc<A> {
     ///
     /// See [`GlobalAlloc::alloc`].
     pub unsafe fn alloc(&mut self, layout: Layout) -> *mut u8 {
-        self.heap
-            .malloc_aligned(layout.size(), layout.align(), &self.os_alloc)
+        self.heap.malloc_aligned(
+            layout.size(),
+            layout.align(),
+            &self.os_alloc,
+            #[cfg(feature = "deferred_free")]
+            self.deferred_free_hook,
+        )
     }
 
     /// [`GlobalAlloc::dealloc`] but requires a mutable reference `&mut self`.

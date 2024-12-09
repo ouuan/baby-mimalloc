@@ -5,6 +5,8 @@ use crate::segment::{PageKind, Segment};
 use crate::utils::{
     bin_for_size, wsize_from_size, BLOCK_SIZE_FOR_BIN, WSIZE_RANGE_IN_SAME_SMALL_BIN,
 };
+#[cfg(feature = "deferred_free")]
+use crate::{DeferredFreeHandle, DeferredFreeHook};
 use core::alloc::GlobalAlloc;
 use core::ptr::{null_mut, NonNull};
 
@@ -12,8 +14,9 @@ pub struct Heap {
     pages_free_direct: [NonNull<Page>; MI_SMALL_WSIZE_MAX + 1],
     pages: [LinkedList<Page>; MI_BIN_HUGE + 1],
     small_free_segments: LinkedList<Segment>,
-    deferred_free_hook: Option<fn(bool, u64)>,
+    #[cfg(feature = "deferred_free")]
     heartbeat: u64,
+    #[cfg(feature = "deferred_free")]
     calling_deferred_free: bool,
 }
 
@@ -29,18 +32,37 @@ impl Heap {
             pages_free_direct: [empty_page(); MI_SMALL_WSIZE_MAX + 1],
             pages: [const { LinkedList::new() }; MI_BIN_HUGE + 1],
             small_free_segments: LinkedList::new(),
-            deferred_free_hook: None,
+            #[cfg(feature = "deferred_free")]
             heartbeat: 0,
+            #[cfg(feature = "deferred_free")]
             calling_deferred_free: false,
         }
     }
 
-    pub fn malloc<A: GlobalAlloc>(&mut self, size: usize, os_alloc: &A) -> *mut u8 {
+    #[inline(never)]
+    pub fn malloc<A: GlobalAlloc>(
+        &mut self,
+        size: usize,
+        os_alloc: &A,
+        #[cfg(feature = "deferred_free")] deferred_free_hook: Option<DeferredFreeHook<A>>,
+    ) -> *mut u8 {
         let result = if size <= MI_SMALL_SIZE_MAX {
             let page = self.get_small_free_page(size);
-            Page::malloc_fast(page, self, size, os_alloc)
+            Page::malloc_fast(
+                page,
+                self,
+                size,
+                os_alloc,
+                #[cfg(feature = "deferred_free")]
+                deferred_free_hook,
+            )
         } else {
-            self.malloc_generic(size, os_alloc)
+            self.malloc_generic(
+                size,
+                os_alloc,
+                #[cfg(feature = "deferred_free")]
+                deferred_free_hook,
+            )
         };
         debug_assert!(
             match &result {
@@ -64,11 +86,17 @@ impl Heap {
         size: usize,
         align: usize,
         os_alloc: &A,
+        #[cfg(feature = "deferred_free")] deferred_free_hook: Option<DeferredFreeHook<A>>,
     ) -> *mut u8 {
         debug_assert!(align.is_power_of_two());
 
         if align <= MI_INTPTR_SIZE {
-            return self.malloc(size, os_alloc);
+            return self.malloc(
+                size,
+                os_alloc,
+                #[cfg(feature = "deferred_free")]
+                deferred_free_hook,
+            );
         }
         if size >= usize::MAX - align {
             return null_mut();
@@ -78,17 +106,29 @@ impl Heap {
             let page = self.get_small_free_page(size);
             let free = unsafe { page.as_ref() }.free();
             if !free.is_null() && (free as usize & (align - 1) == 0) {
-                return Page::malloc_fast(page, self, size, os_alloc)
-                    .map_or(null_mut(), |(ptr, _)| ptr.as_ptr());
+                return Page::malloc_fast(
+                    page,
+                    self,
+                    size,
+                    os_alloc,
+                    #[cfg(feature = "deferred_free")]
+                    deferred_free_hook,
+                )
+                .map_or(null_mut(), |(ptr, _)| ptr.as_ptr());
             }
         }
 
-        self.malloc_generic(size + align - 1, os_alloc)
-            .map_or(null_mut(), |(ptr, page)| {
-                page.set_aligned(true);
-                let aligned_addr = (ptr.as_ptr() as usize + align - 1) & !(align - 1);
-                aligned_addr as *mut u8
-            })
+        self.malloc_generic(
+            size + align - 1,
+            os_alloc,
+            #[cfg(feature = "deferred_free")]
+            deferred_free_hook,
+        )
+        .map_or(null_mut(), |(ptr, page)| {
+            page.set_aligned(true);
+            let aligned_addr = (ptr.as_ptr() as usize + align - 1) & !(align - 1);
+            aligned_addr as *mut u8
+        })
     }
 
     pub fn free<A: GlobalAlloc>(&mut self, p: *mut u8, os_alloc: &A) {
@@ -108,8 +148,10 @@ impl Heap {
         &mut self,
         size: usize,
         os_alloc: &A,
+        #[cfg(feature = "deferred_free")] deferred_free_hook: Option<DeferredFreeHook<A>>,
     ) -> Option<(NonNull<u8>, &mut Page)> {
-        self.deferred_free(false);
+        #[cfg(feature = "deferred_free")]
+        self.deferred_free(false, os_alloc, deferred_free_hook);
 
         let page = if size <= MI_LARGE_SIZE_MAX {
             self.find_free_page(size, os_alloc)
@@ -117,19 +159,35 @@ impl Heap {
             self.alloc_huge_page(size, os_alloc)
         };
 
-        NonNull::new(page).and_then(|p| Page::malloc_fast(p, self, size, os_alloc))
+        NonNull::new(page).and_then(|p| {
+            Page::malloc_fast(
+                p,
+                self,
+                size,
+                os_alloc,
+                #[cfg(feature = "deferred_free")]
+                deferred_free_hook,
+            )
+        })
     }
 
-    pub const fn register_deferred_free(&mut self, hook: fn(bool, u64)) {
-        self.deferred_free_hook = Some(hook);
-    }
-
-    fn deferred_free(&mut self, force: bool) {
+    #[cfg(feature = "deferred_free")]
+    fn deferred_free<A: GlobalAlloc>(
+        &mut self,
+        force: bool,
+        os_alloc: &A,
+        deferred_free_hook: Option<DeferredFreeHook<A>>,
+    ) {
         self.heartbeat = self.heartbeat.wrapping_add(1);
-        if let Some(hook) = self.deferred_free_hook {
+        if let Some(hook) = deferred_free_hook {
             if !self.calling_deferred_free {
                 self.calling_deferred_free = true;
-                hook(force, self.heartbeat);
+                let heartbeat = self.heartbeat;
+                let mut handle = DeferredFreeHandle {
+                    heap: self,
+                    os_alloc,
+                };
+                hook(&mut handle, force, heartbeat);
                 self.calling_deferred_free = false;
             }
         }

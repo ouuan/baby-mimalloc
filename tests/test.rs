@@ -140,7 +140,7 @@ fn random_alloc_dealloc_small() {
                 ptrs[i].extend((old..new).map(|_| test_alloc(&mut allocator, size, 1)));
             } else {
                 ptrs[i]
-                    .splice(new.., [])
+                    .drain(new..)
                     .for_each(|(ptr, layout)| unsafe { allocator.dealloc(ptr, layout) });
             }
             ptrs[i].shuffle(&mut rng);
@@ -182,7 +182,7 @@ fn random_alloc_dealloc_small_collect() {
                 ptrs[i].extend((old..new).map(|_| test_alloc(&mut allocator, size, 1)));
             } else {
                 ptrs[i]
-                    .splice(new.., [])
+                    .drain(new..)
                     .for_each(|(ptr, layout)| unsafe { allocator.dealloc(ptr, layout) });
             }
             ptrs[i].shuffle(&mut rng);
@@ -226,7 +226,7 @@ fn random_alloc_dealloc_large() {
                 }));
             } else {
                 allocation[i]
-                    .splice(new.., [])
+                    .drain(new..)
                     .for_each(|(p, layout)| unsafe { allocator.dealloc(p, layout) });
             }
             allocation[i].shuffle(&mut rng);

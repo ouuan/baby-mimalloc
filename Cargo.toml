@@ -22,10 +22,15 @@ std = []
 mmap = ["dep:libc"]
 std_mutex = ["std"]
 spin_mutex = ["dep:spin"]
+deferred_free = []
 
 [[test]]
 name = "global_alloc"
 required-features = ["mmap", "spin_mutex"]
+
+[[test]]
+name = "deferred_free"
+required-features = ["deferred_free"]
 
 [package.metadata.docs.rs]
 all-features = true

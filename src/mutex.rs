@@ -16,8 +16,9 @@ impl<A: GlobalAlloc> MimallocMutexWrapper<A> {
         Self(Mutex::new(Mimalloc::with_os_allocator(os_alloc)))
     }
 
+    #[cfg(feature = "deferred_free")]
     /// See [`Mimalloc::register_deferred_free`].
-    pub fn register_deferred_free(&self, hook: fn(force: bool, heartbeat: u64)) {
+    pub fn register_deferred_free(&self, hook: crate::DeferredFreeHook<A>) {
         self.allocator().register_deferred_free(hook);
     }
 
