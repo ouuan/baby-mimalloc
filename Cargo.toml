@@ -25,3 +25,7 @@ spin_mutex = ["dep:spin"]
 [[test]]
 name = "global_alloc"
 required-features = ["mmap", "spin_mutex"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
