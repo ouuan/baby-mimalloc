@@ -31,6 +31,11 @@ unsafe fn mmap_anoymous(size: usize) -> *mut c_void {
 }
 
 unsafe impl GlobalAlloc for MmapAlloc {
+    /// See [`GlobalAlloc::alloc`].
+    ///
+    /// # Safety
+    ///
+    /// It can only allocate memory layouts whose size and alignment are multiples of the OS page size.
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let size = layout.size();
         let align = layout.align();
