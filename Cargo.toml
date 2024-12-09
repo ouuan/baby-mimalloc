@@ -8,6 +8,7 @@ categories = ["memory-management"]
 license = "Apache-2.0"
 authors = ["Yufan You <ouuansteve@gmail.com>"]
 repository = "https://github.com/ouuan/baby-mimalloc"
+exclude = [".github"]
 
 [dependencies]
 libc = { version = "0.2.167", default-features = false, optional = true }
