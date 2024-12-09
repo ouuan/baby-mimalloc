@@ -9,7 +9,7 @@ Lock-free multi-threading, security features, and some performance enhancements 
 
 It can be used in `no_std` environments.
 
-## Features
+## Crate Features
 
 - **mmap** - Provide `MimallocMmap` that uses `mmap` as OS allocator for segments.
 - **std_mutex** - Provide `MimallocMutexWrapper` that wraps `Mimalloc` inside `std::sync::Mutex` and implements `GlobalAlloc`.
