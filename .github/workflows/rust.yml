@@ -1,0 +1,32 @@
+name: Rust
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          - ""
+          - "--features mmap"
+          - "--features std_mutex"
+          - "--features spin_mutex"
+          - "--features mmap,std_mutex"
+          - "--features mmap,spin_mutex"
+    steps:
+    - uses: actions/checkout@v4
+    - name: Clippy
+      run: cargo clippy ${{ matrix.features }}
+    - name: Build
+      run: cargo build ${{ matrix.features }}
+    - name: Build Documentation
+      run: cargo doc ${{ matrix.features }}
+    - name: Run tests
+      run: cargo test ${{ matrix.features }} --release -- --test-threads 1
