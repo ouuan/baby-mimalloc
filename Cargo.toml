@@ -1,0 +1,27 @@
+[package]
+name = "baby-mimalloc"
+version = "0.1.0"
+edition = "2021"
+description = "Mimalloc implemented in Rust (not a binding to the C library) with only basic features."
+keywords = ["mimalloc", "allocator", "no_std"]
+categories = ["memory-management"]
+license = "Apache-2.0"
+authors = ["Yufan You <ouuansteve@gmail.com>"]
+repository = "https://github.com/ouuan/baby-mimalloc"
+
+[dependencies]
+libc = { version = "0.2.167", default-features = false, optional = true }
+spin = { version = "0.9.8", default-features = false, features = ["spin_mutex"], optional = true }
+
+[dev-dependencies]
+rand = "0.8.5"
+
+[features]
+std = []
+mmap = ["dep:libc"]
+std_mutex = ["std"]
+spin_mutex = ["dep:spin"]
+
+[[test]]
+name = "global_alloc"
+required-features = ["mmap", "spin_mutex"]
