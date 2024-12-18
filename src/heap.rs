@@ -219,7 +219,7 @@ impl Heap {
                 if page_free_count < 8 && page.all_free() {
                     page_free_count += 1;
                     if let Some(rpage) = NonNull::new(page_to_retire) {
-                        self.retire_page(rpage, os_alloc);
+                        self.retire_page(rpage, false, os_alloc);
                     }
                     page_to_retire = p;
                     p = next;
@@ -245,7 +245,7 @@ impl Heap {
         }
 
         if let Some(rpage) = NonNull::new(page_to_retire) {
-            self.retire_page(rpage, os_alloc);
+            self.retire_page(rpage, false, os_alloc);
         }
 
         if p.is_null() {
@@ -348,8 +348,15 @@ impl Heap {
     }
 
     // _mi_page_free
-    pub fn retire_page<A: GlobalAlloc>(&mut self, mut page: NonNull<Page>, os_alloc: &A) {
-        self.page_queue_remove(unsafe { page.as_mut() });
+    pub fn retire_page<A: GlobalAlloc>(
+        &mut self,
+        mut page: NonNull<Page>,
+        full: bool,
+        os_alloc: &A,
+    ) {
+        if !full {
+            self.page_queue_remove(unsafe { page.as_mut() });
+        }
         unsafe { page.write_bytes(0, 1) };
         let segment = unsafe { NonNull::new_unchecked(Segment::of_ptr(page.as_ptr())) };
         Segment::remove_a_page(segment, self, os_alloc);
@@ -363,7 +370,7 @@ impl Heap {
                 page_mut.free_collect();
                 p = page_mut.next();
                 if page_mut.all_free() {
-                    self.retire_page(page, os_alloc);
+                    self.retire_page(page, false, os_alloc);
                 }
             }
         }

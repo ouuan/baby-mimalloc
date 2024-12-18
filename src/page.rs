@@ -113,7 +113,7 @@ impl Page {
             // fast path
             page_mut.free_block_core(p.cast());
             if page_mut.all_free() && page_mut.should_retire() {
-                heap.retire_page(page, os_alloc);
+                heap.retire_page(page, false, os_alloc);
             }
         } else {
             // generic path
@@ -127,10 +127,11 @@ impl Page {
             page_mut.free_block_core(block);
             if page_mut.all_free() {
                 if page_mut.should_retire() {
-                    heap.retire_page(page, os_alloc);
+                    let full = unsafe { page_mut.flags.flags }.full;
+                    heap.retire_page(page, full, os_alloc);
                 }
             } else if unsafe { page_mut.flags.flags }.full {
-                page_mut.flags.flags.full = false;
+                page_mut.set_full(false);
                 heap.page_queue_push_back(page);
             }
         }
@@ -177,7 +178,7 @@ impl Page {
         }
 
         if self.block_size < MI_LARGE_SIZE_MAX && mostly_used(self.prev) && mostly_used(self.next) {
-            self.flags.flag_16 = 0;
+            self.set_aligned(false);
             false
         } else {
             true
