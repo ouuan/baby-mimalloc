@@ -26,6 +26,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        rustflags: '-C debug-assertions -D warnings'
     - name: Calculate features
       id: features
       run: echo "features=${{ matrix.mmap }} ${{ matrix.mutex }} ${{ matrix.deferred_free }}" >> "$GITHUB_OUTPUT"
